@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Knowledge System</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <div class="aurora aurora-one"></div>
+      <div class="aurora aurora-two"></div>
+
+      <header class="hero">
+        <p class="eyebrow">News Intelligence Workspace</p>
+        <div class="hero-grid">
+          <section class="hero-copy panel reveal">
+            <h1>Turn the project’s article pipeline into a searchable newsroom.</h1>
+            <p class="hero-text">
+              Refresh the knowledge base, inspect recent coverage, and ask
+              natural-language questions against the indexed article set.
+            </p>
+            <div class="interest-panel">
+              <p class="interest-label">Choose areas of interest for the next refresh.</p>
+              <p class="interest-hint">Scroll sideways to browse interests. Selected topics move matching news to the top.</p>
+              <div id="interestOptions" class="interest-options"></div>
+              <label class="topic-input-label" for="interestKeywords">
+                Or type topics you care about, like AI, robotics, climate, or startups.
+              </label>
+              <input
+                id="interestKeywords"
+                class="topic-input"
+                type="text"
+                placeholder="Enter topics separated by commas"
+              />
+            </div>
+            <div class="hero-actions">
+              <button id="refreshButton" class="primary-button">
+                Refresh Knowledge Base
+              </button>
+              <span id="refreshMessage" class="status-inline"></span>
+            </div>
+          </section>
+
+          <aside class="metrics panel reveal delay-1">
+            <div class="metric-card">
+              <span class="metric-label">Articles Loaded</span>
+              <strong id="articleCount" class="metric-value">0</strong>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">Indexed Documents</span>
+              <strong id="indexedCount" class="metric-value">0</strong>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">Last Updated</span>
+              <strong id="lastUpdated" class="metric-detail">Not yet synced</strong>
+            </div>
+            <div class="metric-card">
+              <span class="metric-label">Active Interests</span>
+              <div id="activeInterests" class="interest-pill-group"></div>
+            </div>
+          </aside>
+        </div>
+      </header>
+
+      <main class="main-grid">
+        <section class="panel ask-panel reveal delay-2">
+          <div class="panel-heading">
+            <p class="section-kicker">Question the Index</p>
+            <h2>Ask what the current article set knows</h2>
+          </div>
+
+          <form id="questionForm" class="question-form">
+            <label class="question-label" for="questionInput">
+              Ask about topics, companies, or events in the current feed.
+            </label>
+            <textarea
+              id="questionInput"
+              name="question"
+              rows="4"
+              placeholder="What recent stories mention AI regulation or Nvidia?"
+            ></textarea>
+            <button type="submit" class="secondary-button">Ask Question</button>
+          </form>
+
+          <div id="answerPanel" class="answer-panel hidden">
+            <p class="section-kicker">Answer</p>
+            <p id="answerText" class="answer-text"></p>
+            <div id="relatedTopicsPanel" class="hidden">
+              <p class="section-kicker">Related Topics</p>
+              <div id="relatedTopics" class="related-topic-list"></div>
+            </div>
+            <div>
+              <p class="section-kicker">Related Coverage</p>
+              <div id="sourceList" class="source-list"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel article-panel reveal delay-3">
+          <div class="panel-heading">
+            <p class="section-kicker">Article Library</p>
+            <h2>Recent items in the knowledge base</h2>
+          </div>
+          <div id="articleList" class="article-list"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>
