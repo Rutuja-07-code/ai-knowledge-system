@@ -6,10 +6,23 @@ import numpy as np
 MODEL_NAME = "all-MiniLM-L6-v2"
 EMBEDDING_DIMENSION = 384
 
-try:
-    from sentence_transformers import SentenceTransformer
-except ImportError:
-    SentenceTransformer = None
+# try:
+#     from sentence_transformers import SentenceTransformer
+# except ImportError:
+#     SentenceTransformer = None
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+def search(query, articles):
+    texts = [a["content"] for a in articles]
+
+    vectorizer = TfidfVectorizer()
+    vectors = vectorizer.fit_transform(texts + [query])
+
+    similarity = cosine_similarity(vectors[-1], vectors[:-1])
+    best_index = similarity.argmax()
+
+    return articles[best_index]
 
 _model = None
 _model_load_failed = False
