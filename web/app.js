@@ -4,8 +4,6 @@ const lastUpdatedEl = document.getElementById("lastUpdated");
 const activeInterestsEl = document.getElementById("activeInterests");
 const interestOptions = document.getElementById("interestOptions");
 const interestKeywordsInput = document.getElementById("interestKeywords");
-const refreshButton = document.getElementById("refreshButton");
-const refreshMessage = document.getElementById("refreshMessage");
 const questionForm = document.getElementById("questionForm");
 const questionInput = document.getElementById("questionInput");
 const answerPanel = document.getElementById("answerPanel");
@@ -328,13 +326,10 @@ async function refreshKnowledgeBase(messagePrefix = "Refreshing feeds and rebuil
   }
 
   if (!selectedInterests.length) {
-    refreshMessage.textContent = "Select at least one area of interest before refreshing.";
     return;
   }
 
   refreshInFlight = true;
-  refreshButton.disabled = true;
-  refreshMessage.textContent = messagePrefix;
 
   try {
     const payload = await fetchJson("/api/refresh", {
@@ -352,12 +347,10 @@ async function refreshKnowledgeBase(messagePrefix = "Refreshing feeds and rebuil
     interestKeywordsInput.value = interestKeywords.join(", ");
     renderActiveInterests();
     updateArticleList();
-    refreshMessage.textContent = payload.message;
   } catch (error) {
-    refreshMessage.textContent = error.message;
+    console.error(messagePrefix, error);
   } finally {
     refreshInFlight = false;
-    refreshButton.disabled = false;
   }
 }
 
@@ -496,10 +489,6 @@ interestKeywordsInput.addEventListener("input", () => {
   updateArticleList();
 });
 
-refreshButton.addEventListener("click", async () => {
-  await refreshKnowledgeBase();
-});
-
 questionForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
@@ -539,5 +528,5 @@ questionForm.addEventListener("submit", async (event) => {
 
 loadDashboard().catch((error) => {
   renderArticlesError(error.message);
-  refreshMessage.textContent = error.message;
+  console.error(error);
 });
