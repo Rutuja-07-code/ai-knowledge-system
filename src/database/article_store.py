@@ -54,8 +54,8 @@ class ArticleStore:
         if not self.legacy_json_path or not self.legacy_json_path.exists():
             return
 
-        if self.count_articles() > 0:
-            return
+        # if self.count_articles() > 0:
+        #     return
 
         with self.legacy_json_path.open("r", encoding="utf-8") as file:
             articles = json.load(file)
