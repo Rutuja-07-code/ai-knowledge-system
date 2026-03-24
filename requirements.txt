@@ -6,3 +6,4 @@ faiss-cpu
 numpy
 fastapi
 uvicorn
+scikit-learn
