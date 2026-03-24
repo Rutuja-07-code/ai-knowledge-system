@@ -242,7 +242,7 @@ function renderArticles(articles) {
     return;
   }
 
-  articleList.innerHTML = sortArticlesByLatest(articles)
+  articleList.innerHTML = articles
     .map(
       (article) => `
         <article class="article-card">

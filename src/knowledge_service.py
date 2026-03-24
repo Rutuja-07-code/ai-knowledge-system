@@ -48,7 +48,9 @@ class KnowledgeService:
     def refresh_articles(self, selected_interests=None, interest_keywords=None):
         interest_keys = self._normalize_selected_interests(selected_interests)
         keywords = self._normalize_interest_keywords(interest_keywords)
-        articles = collect_news(selected_interests=interest_keys)
+        # Always refresh the full feed set. Selected interests are stored as
+        # viewing preferences and used by the UI to prioritize matching news.
+        articles = collect_news()
 
         if not articles:
             raise RuntimeError(

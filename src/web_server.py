@@ -64,7 +64,11 @@ async def api_refresh(request: Request):
         message = "Knowledge base refreshed and filtered to your typed interests."
     elif refresh_result["keywords_fallback"]:
         message = (
-            "No articles matched the typed interests exactly, so the selected feeds were kept."
+            "No articles matched the typed interests exactly, so the full feed set was kept."
+        )
+    elif selected_interests:
+        message = (
+            "Knowledge base refreshed with all news. Your selected interests are prioritized at the top."
         )
 
     return {
