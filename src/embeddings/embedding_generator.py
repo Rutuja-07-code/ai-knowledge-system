@@ -6,10 +6,10 @@ import numpy as np
 MODEL_NAME = "all-MiniLM-L6-v2"
 EMBEDDING_DIMENSION = 384
 
-try:
-    from sentence_transformers import SentenceTransformer
-except ImportError:
-    SentenceTransformer = None
+# try:
+#     from sentence_transformers import SentenceTransformer
+# except ImportError:
+#     SentenceTransformer = None
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
