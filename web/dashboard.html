@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard — AI Knowledge System</title>
+    <meta name="description" content="Your personalized AI-powered news dashboard with smart Q&A, article summaries, and interest-based filtering." />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="aurora-wrap">
+      <div class="aurora aurora-one"></div>
+      <div class="aurora aurora-two"></div>
+    </div>
+
+    <div class="page-shell">
+      <!-- Navbar -->
+      <nav id="navbar" class="navbar">
+        <div class="nav-brand">
+          <span class="nav-brand-icon">AI</span>
+          <span>Knowledge System</span>
+        </div>
+        <div class="nav-spacer"></div>
+        <div class="nav-user">
+          <span id="navAvatar" class="nav-avatar">U</span>
+          <span id="navName">User</span>
+        </div>
+        <button id="btnLogout" class="nav-logout">Sign Out</button>
+      </nav>
+
+      <!-- Dashboard content -->
+      <div class="dash-content">
+        <!-- Hero row -->
+        <div class="dash-hero reveal">
+          <div class="dash-hero-text">
+            <p id="dashGreeting" class="dash-greeting">Good evening</p>
+            <h1>Today's <span>Intelligence Brief</span></h1>
+          </div>
+          <div class="dash-hero-side">
+            <div class="metrics-strip">
+              <div class="metric-pill">
+                📰 <strong id="metricArticles">0</strong> Articles
+              </div>
+              <div class="metric-pill">
+                🗂️ <strong id="metricIndexed">0</strong> Indexed
+              </div>
+              <div class="metric-pill">
+                🕐 <span id="metricUpdated">Not yet synced</span>
+              </div>
+            </div>
+            <button id="btnRefreshNews" class="btn btn-secondary">Refresh News</button>
+          </div>
+        </div>
+
+        <!-- Interest filter bar -->
+        <div id="filterBar" class="filter-bar reveal delay-1">
+          <!-- filled by JS -->
+        </div>
+
+        <!-- Main grid -->
+        <div class="dash-grid">
+          <!-- Q&A Panel -->
+          <section class="qa-panel glass reveal delay-2">
+            <div class="panel-header">
+              <p class="panel-kicker">🔍 Question the Index</p>
+              <h2 class="panel-title">Ask about today's news</h2>
+            </div>
+
+            <form id="questionForm">
+              <div class="search-box">
+                <span class="search-icon">🔎</span>
+                <textarea
+                  id="questionInput"
+                  class="search-input"
+                  rows="3"
+                  placeholder="What recent stories mention AI regulation or Nvidia?"
+                ></textarea>
+              </div>
+              <button type="submit" class="btn btn-primary" style="width: 100%;">Ask Question</button>
+            </form>
+
+            <div id="answerPanel" class="hidden">
+              <div class="answer-box">
+                <p class="answer-label">Answer</p>
+                <p id="answerText" class="answer-text"></p>
+              </div>
+
+              <div id="relatedPanel" class="related-panel hidden">
+                <p class="answer-label" style="margin-top: 16px;">Related Topics</p>
+                <div id="relatedChips" class="related-chips"></div>
+              </div>
+
+              <div id="sourcePanel" class="hidden">
+                <p class="answer-label" style="margin-top: 16px;">Related Coverage</p>
+                <div id="sourceList" class="source-list"></div>
+              </div>
+            </div>
+          </section>
+
+          <!-- News Feed Panel -->
+          <section class="news-panel glass reveal delay-3">
+            <div class="panel-header">
+              <p class="panel-kicker">📰 Article Library</p>
+              <h2 class="panel-title">Latest in your interests</h2>
+            </div>
+            <div id="articleGrid" class="article-grid">
+              <div class="empty-state">Loading articles...</div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>

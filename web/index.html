@@ -3,103 +3,90 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Knowledge System</title>
+    <title>AI Knowledge System — Welcome</title>
+    <meta name="description" content="AI-powered news intelligence. Get personalized news feeds, ask questions, and generate article summaries using transformers." />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <div class="page-shell">
+    <div class="aurora-wrap">
       <div class="aurora aurora-one"></div>
       <div class="aurora aurora-two"></div>
-
-      <header class="hero">
-        <p class="eyebrow">News Intelligence Workspace</p>
-        <div class="hero-grid">
-          <section class="hero-copy panel reveal">
-            <h1>Understand the World Before It Happens.</h1>
-            <p class="hero-text">
-             AI analyzes global news in real time to surface trends, risks, and opportunities.
-            </p>
-            <div class="interest-panel">
-              <p class="interest-label">Choose areas of interest to prioritize in the news feed.</p>
-              <p class="interest-hint">Scroll sideways to browse interests. All news stays visible, and selected topics move matching stories to the top.</p>
-              <div id="interestOptions" class="interest-options"></div>
-              <label class="topic-input-label" for="interestKeywords">
-                Or type topics you care about, like AI, robotics, climate, or startups.
-              </label>
-              <input
-                id="interestKeywords"
-                class="topic-input"
-                type="text"
-                placeholder="Enter topics separated by commas"
-              />
-            </div>
-          </section>
-
-          <aside class="metrics panel reveal delay-1">
-            <div class="metric-card">
-              <span class="metric-label">Articles Loaded</span>
-              <strong id="articleCount" class="metric-value">0</strong>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">Indexed Documents</span>
-              <strong id="indexedCount" class="metric-value">0</strong>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">Last Updated</span>
-              <strong id="lastUpdated" class="metric-detail">Not yet synced</strong>
-            </div>
-            <div class="metric-card">
-              <span class="metric-label">Active Interests</span>
-              <div id="activeInterests" class="interest-pill-group"></div>
-            </div>
-          </aside>
-        </div>
-      </header>
-
-      <main class="main-grid">
-        <section class="panel ask-panel reveal delay-2">
-          <div class="panel-heading">
-            <p class="section-kicker">Question the Index</p>
-            <h2>Ask what the current article set knows</h2>
-          </div>
-
-          <form id="questionForm" class="question-form">
-            <label class="question-label" for="questionInput">
-              Ask about topics, companies, or events in the current feed.
-            </label>
-            <textarea
-              id="questionInput"
-              name="question"
-              rows="4"
-              placeholder="What recent stories mention AI regulation or Nvidia?"
-            ></textarea>
-            <button type="submit" class="secondary-button">Ask Question</button>
-          </form>
-
-          <div id="answerPanel" class="answer-panel hidden">
-            <p class="section-kicker">Answer</p>
-            <p id="answerText" class="answer-text"></p>
-            <div id="relatedTopicsPanel" class="hidden">
-              <p class="section-kicker">Related Topics</p>
-              <div id="relatedTopics" class="related-topic-list"></div>
-            </div>
-            <div>
-              <p class="section-kicker">Related Coverage</p>
-              <div id="sourceList" class="source-list"></div>
-            </div>
-          </div>
-        </section>
-
-        <section class="panel article-panel reveal delay-3">
-          <div class="panel-heading">
-            <p class="section-kicker">Article Library</p>
-            <h2>Recent items in the knowledge base</h2>
-          </div>
-          <div id="articleList" class="article-list"></div>
-        </section>
-      </main>
+      <div class="aurora aurora-three"></div>
     </div>
 
-    <script src="/app.js" defer></script>
+    <div class="page-shell login-page">
+      <div class="login-card glass reveal">
+        <div class="login-logo">AI</div>
+        <h1 class="login-title">AI Knowledge System</h1>
+        <p class="login-subtitle">Your intelligent news companion — powered by AI.</p>
+
+        <!-- Step indicators -->
+        <div class="step-indicators">
+          <div class="step-dot active" data-step="0"></div>
+          <div class="step-dot" data-step="1"></div>
+          <div class="step-dot" data-step="2"></div>
+        </div>
+
+        <!-- Step 0: Welcome -->
+        <div id="step0" class="login-step active">
+          <p style="color: var(--ink-soft); margin: 0 0 12px; font-size: 1.05rem;">
+            Real-time news analysis, smart Q&amp;A, and AI-powered article summaries — all personalized to your interests.
+          </p>
+          <div style="display: grid; gap: 12px; text-align: left; margin: 24px 0 32px;">
+            <div style="display: flex; gap: 12px; align-items: start; padding: 14px; border-radius: var(--radius-md); background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border);">
+              <span style="font-size: 1.3rem;">📰</span>
+              <div>
+                <strong style="font-size: 0.9rem;">Personalized News Feed</strong>
+                <p style="margin: 4px 0 0; font-size: 0.82rem; color: var(--ink-muted);">News from top sources, filtered to your interests</p>
+              </div>
+            </div>
+            <div style="display: flex; gap: 12px; align-items: start; padding: 14px; border-radius: var(--radius-md); background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border);">
+              <span style="font-size: 1.3rem;">🔍</span>
+              <div>
+                <strong style="font-size: 0.9rem;">Ask Anything</strong>
+                <p style="margin: 4px 0 0; font-size: 0.82rem; color: var(--ink-muted);">Query your news index with natural language</p>
+              </div>
+            </div>
+            <div style="display: flex; gap: 12px; align-items: start; padding: 14px; border-radius: var(--radius-md); background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border);">
+              <span style="font-size: 1.3rem;">✨</span>
+              <div>
+                <strong style="font-size: 0.9rem;">AI Summaries</strong>
+                <p style="margin: 4px 0 0; font-size: 0.82rem; color: var(--ink-muted);">Transformer-powered article summarization on demand</p>
+              </div>
+            </div>
+          </div>
+          <button id="btnGetStarted" class="btn btn-primary btn-full">Get Started →</button>
+        </div>
+
+        <!-- Step 1: Profile -->
+        <div id="step1" class="login-step">
+          <h2 style="margin: 0 0 6px; font-size: 1.25rem; font-weight: 700;">What's your name?</h2>
+          <p style="margin: 0 0 24px; color: var(--ink-soft); font-size: 0.9rem;">We'll use this to personalize your experience.</p>
+          <div class="form-group">
+            <label class="form-label" for="userName">Your Name</label>
+            <input id="userName" class="form-input" type="text" placeholder="e.g. Rutuja" autocomplete="name" />
+          </div>
+          <div style="display: flex; gap: 12px; margin-top: 8px;">
+            <button id="btnBackToWelcome" class="btn btn-secondary" style="flex: 0 0 auto;">← Back</button>
+            <button id="btnToInterests" class="btn btn-primary" style="flex: 1;" disabled>Continue →</button>
+          </div>
+        </div>
+
+        <!-- Step 2: Interests -->
+        <div id="step2" class="login-step">
+          <h2 style="margin: 0 0 6px; font-size: 1.25rem; font-weight: 700;">Pick your interests</h2>
+          <p style="margin: 0 0 24px; color: var(--ink-soft); font-size: 0.9rem;">Select at least one topic to personalize your news feed.</p>
+          <div id="interestGrid" class="interest-grid">
+            <!-- filled by JS -->
+          </div>
+          <div style="display: flex; gap: 12px;">
+            <button id="btnBackToProfile" class="btn btn-secondary" style="flex: 0 0 auto;">← Back</button>
+            <button id="btnLaunch" class="btn btn-primary" style="flex: 1;" disabled>Launch Dashboard 🚀</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="/login.js" defer></script>
   </body>
 </html>

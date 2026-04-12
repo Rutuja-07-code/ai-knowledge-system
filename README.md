@@ -2,13 +2,23 @@
 
 This project now includes a browser-based frontend for refreshing the article
 pipeline, browsing indexed news, and asking questions against the local
-knowledge base. Article persistence now uses SQLite, with automatic import from
-the legacy `articles.json` file on first run.
+knowledge base. Article persistence uses SQLite and now prefers live news feeds
+instead of the bundled `articles.json` seed file.
 
 ## Run the frontend
 
 1. Install the dependencies in `requirements.txt`.
-2. Start the web server:
+2. Start the backend and Ollama together:
+
+```bash
+./run_backend.sh
+```
+
+This launcher starts `Ollama` only for the backend session if it is not already
+running, and it keeps startup refresh disabled by default so the app does not
+fetch news until you explicitly click `Refresh News` in the dashboard.
+
+If you prefer to start the API manually instead, you can still run:
 
 ```bash
 uvicorn src.web_server:app --reload
@@ -24,12 +34,20 @@ through the FastAPI app.
 
 ## What the app does
 
-- Loads existing articles from SQLite
+- Loads cached articles from SQLite
 - Rebuilds the vector index on startup
-- Refreshes RSS feeds and saves the latest articles into `data/knowledge.db`
+- Refreshes live RSS feeds and saves the latest articles into `data/knowledge.db`
 - Lets the user choose which news interests to refresh before pulling articles
 - Uses Ollama to generate answers from the top matching sources
 - Returns related topics and related coverage for each question
+
+## Live News Behavior
+
+- On startup, the app uses cached SQLite data by default.
+- Live RSS refresh happens only when you call the refresh API or click `Refresh News`.
+- If the refresh fails, it falls back to the most recent cached SQLite data.
+- Legacy import from `articles.json` is disabled by default.
+- To re-enable legacy import explicitly, set `AI_KNOWLEDGE_ENABLE_LEGACY_IMPORT=true`.
 
 ## Ollama
 
@@ -61,7 +79,7 @@ Important:
 - SQLite database path: `data/knowledge.db`
 - Main table: `articles`
 - Metadata table: `metadata`
-- Legacy JSON import: automatic on first startup if the database is empty
+- Legacy JSON import: optional only when `AI_KNOWLEDGE_ENABLE_LEGACY_IMPORT=true`
 
 ## Project structure
 

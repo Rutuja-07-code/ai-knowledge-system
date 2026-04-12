@@ -7,3 +7,5 @@ numpy
 fastapi
 uvicorn
 scikit-learn
+transformers
+torch

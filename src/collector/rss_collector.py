@@ -19,12 +19,36 @@ INTEREST_FEEDS = {
     },
     "world": {
         "label": "World",
-        "url": "https://rss.nytimes.com/services/xml/rss/nyt/world.xml",
-        "url": "http://feeds.bbci.co.uk/news/world/rss.xml",
-        "url": "https://www.aljazeera.com/xml/rss/all.xml",
+        "url": ["https://rss.nytimes.com/services/xml/rss/nyt/world.xml",
+                 "http://feeds.bbci.co.uk/news/world/rss.xml",
+                 "https://www.aljazeera.com/xml/rss/all.xml",]
     },
-    
+    # NEW
+    "business": {
+        "label": "Business",
+        "url": ["https://rss.nytimes.com/services/xml/rss/nyt/Business.xml"],
+    },
+    "health": {
+        "label": "Health",
+        "url": ["https://rss.nytimes.com/services/xml/rss/nyt/Health.xml"],
+    },
+    "sports": {
+        "label": "Sports",
+        "url": ["http://feeds.bbci.co.uk/sport/rss.xml"],
+    },
+    "ai_ml": {
+        "label": "AI & Machine Learning",
+        "url": [
+            "https://news.google.com/rss/search?q=artificial+intelligence",
+            "https://machinelearningmastery.com/feed/",
+        ],
+    },
+    "climate": {
+        "label": "Climate & Environment",
+        "url": ["https://rss.nytimes.com/services/xml/rss/nyt/Climate.xml"],
+    },
 }
+
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0",
@@ -85,33 +109,38 @@ def collect_news(selected_interests=None, limit_per_feed=10, timeout=10):
 
     for interest_key in interest_keys:
         interest_config = INTEREST_FEEDS[interest_key]
-        feed_url = interest_config["url"]
-        try:
-            response = requests.get(feed_url, headers=HEADERS, timeout=timeout)
-            response.raise_for_status()
-        except requests.RequestException:
-            continue
+        raw_url = interest_config["url"]
 
-        feed = feedparser.parse(response.content)
+        # Normalize to a list so both single-string and list configs work
+        feed_urls = raw_url if isinstance(raw_url, list) else [raw_url]
 
-        for entry in feed.entries[:limit_per_feed]:
-            article_url = entry.get("link", "").strip()
-            if not article_url or article_url in seen_links:
+        for feed_url in feed_urls:
+            try:
+                response = requests.get(feed_url, headers=HEADERS, timeout=timeout)
+                response.raise_for_status()
+            except requests.RequestException:
                 continue
 
-            seen_links.add(article_url)
-            content = _fetch_article_content(article_url) or extract_rss_content(entry)
+            feed = feedparser.parse(response.content)
 
-            articles.append(
-                {
-                    "title": entry.get("title", "Untitled Article"),
-                    "link": article_url,
-                    "published": entry.get("published", ""),
-                    "content": content.strip(),
-                    "content_source": "article" if content else "rss",
-                    "category": interest_config["label"],
-                }
-            )
+            for entry in feed.entries[:limit_per_feed]:
+                article_url = entry.get("link", "").strip()
+                if not article_url or article_url in seen_links:
+                    continue
+
+                seen_links.add(article_url)
+                content = _fetch_article_content(article_url) or extract_rss_content(entry)
+
+                articles.append(
+                    {
+                        "title": entry.get("title", "Untitled Article"),
+                        "link": article_url,
+                        "published": entry.get("published", ""),
+                        "content": content.strip(),
+                        "content_source": "article" if content else "rss",
+                        "category": interest_config["label"],
+                    }
+                )
 
     return articles
 

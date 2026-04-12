@@ -1,122 +1,119 @@
-const articleCountEl = document.getElementById("articleCount");
-const indexedCountEl = document.getElementById("indexedCount");
-const lastUpdatedEl = document.getElementById("lastUpdated");
-const activeInterestsEl = document.getElementById("activeInterests");
-const interestOptions = document.getElementById("interestOptions");
-const interestKeywordsInput = document.getElementById("interestKeywords");
+/* ============================================================
+   Dashboard — app.js
+   Handles auth guard, news feed, Q&A, interest filtering,
+   and on-demand transformer summarization.
+   ============================================================ */
+
+/* ----- Auth guard ----- */
+const profile = (() => {
+  try {
+    const raw = localStorage.getItem("aiks_profile");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed.name && Array.isArray(parsed.interests) && parsed.interests.length > 0) {
+      return parsed;
+    }
+    return null;
+  } catch (_) {
+    return null;
+  }
+})();
+
+if (!profile) {
+  window.location.href = "/index.html";
+}
+
+/* ----- DOM refs ----- */
+const navAvatar = document.getElementById("navAvatar");
+const navName = document.getElementById("navName");
+const btnLogout = document.getElementById("btnLogout");
+const dashGreeting = document.getElementById("dashGreeting");
+const metricArticles = document.getElementById("metricArticles");
+const metricIndexed = document.getElementById("metricIndexed");
+const metricUpdated = document.getElementById("metricUpdated");
+const btnRefreshNews = document.getElementById("btnRefreshNews");
+const filterBar = document.getElementById("filterBar");
 const questionForm = document.getElementById("questionForm");
 const questionInput = document.getElementById("questionInput");
 const answerPanel = document.getElementById("answerPanel");
 const answerText = document.getElementById("answerText");
-const relatedTopicsPanel = document.getElementById("relatedTopicsPanel");
-const relatedTopics = document.getElementById("relatedTopics");
+const relatedPanel = document.getElementById("relatedPanel");
+const relatedChips = document.getElementById("relatedChips");
+const sourcePanel = document.getElementById("sourcePanel");
 const sourceList = document.getElementById("sourceList");
-const articleList = document.getElementById("articleList");
-const DEFAULT_INTERESTS = [
-  { key: "technology", label: "Technology" },
-  { key: "science", label: "Science" },
-  { key: "world", label: "World" },
-];
-const AUTO_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
-let availableInterests = [];
-let selectedInterests = [];
-let interestKeywords = [];
+const articleGrid = document.getElementById("articleGrid");
+
+/* ----- State ----- */
 let allArticles = [];
-let autoRefreshStarted = false;
-let autoRefreshTimer = null;
+let availableInterests = [];
+let activeFilter = "all";
 let refreshInFlight = false;
+
+/* ----- Init ----- */
+function initProfile() {
+  if (!profile) return;
+  const initial = profile.name.charAt(0).toUpperCase();
+  navAvatar.textContent = initial;
+  navName.textContent = profile.name;
+
+  const hour = new Date().getHours();
+  let greeting = "Good evening";
+  if (hour < 12) greeting = "Good morning";
+  else if (hour < 17) greeting = "Good afternoon";
+  dashGreeting.textContent = `${greeting}, ${profile.name}`;
+}
+initProfile();
+
+/* ----- Logout ----- */
+btnLogout.addEventListener("click", () => {
+  localStorage.removeItem("aiks_profile");
+  window.location.href = "/index.html";
+});
+
+/* ----- Utilities ----- */
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value);
+}
 
 async function fetchJson(url, options = {}) {
   const response = await fetch(url, {
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     ...options,
   });
-
-  const rawText = await response.text();
+  const raw = await response.text();
   let payload = {};
-
-  if (rawText) {
+  if (raw) {
     try {
-      payload = JSON.parse(rawText);
-    } catch (error) {
-      payload = {
-        error: `The server returned an unexpected response for ${url}.`,
-      };
+      payload = JSON.parse(raw);
+    } catch (_) {
+      payload = { error: `Unexpected response from ${url}.` };
     }
   }
-
   if (!response.ok) {
-    throw new Error(payload.error || `Request failed with status ${response.status}.`);
+    throw new Error(payload.error || `Request failed (${response.status}).`);
   }
-
   return payload;
 }
 
 function formatDate(value) {
-  if (!value) {
-    return "Not yet synced";
-  }
-
+  if (!value) return "Not yet synced";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
 function dateRank(value) {
-  if (!value) {
-    return 0;
-  }
-
-  const parsed = new Date(value).getTime();
-  if (!Number.isNaN(parsed)) {
-    return parsed;
-  }
-
-  return 0;
-}
-
-function sortArticlesByLatest(articles) {
-  return [...articles].sort(
-    (left, right) =>
-      dateRank(right.published) - dateRank(left.published) ||
-      dateRank(right.fetched_at) - dateRank(left.fetched_at)
-  );
-}
-
-function articleSummary(article) {
-  return article.summary || article.content || "No summary available yet.";
-}
-
-function articleMeta(article) {
-  const parts = [];
-
-  if (article.category) {
-    parts.push(article.category);
-  }
-
-  if (article.published) {
-    parts.push(article.published);
-  }
-
-  return parts.join(" • ") || "Publication date unavailable";
-}
-
-function renderStatus(status) {
-  articleCountEl.textContent = String(status.article_count ?? 0);
-  indexedCountEl.textContent = String(status.indexed_count ?? 0);
-  lastUpdatedEl.textContent = formatDate(status.last_updated);
-}
-
-function parseInterestKeywords(value) {
-  return String(value || "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
+  if (!value) return 0;
+  const t = new Date(value).getTime();
+  return Number.isNaN(t) ? 0 : t;
 }
 
 function interestKeyFromValue(value) {
@@ -127,385 +124,194 @@ function interestKeyFromValue(value) {
     .replace(/^-+|-+$/g, "");
 }
 
-function buildAvailableInterests(status, articles) {
-  const merged = [];
-  const seen = new Set();
-  const backendInterests = Array.isArray(status.available_interests)
-    ? status.available_interests
-    : [];
-
-  for (const interest of [...DEFAULT_INTERESTS, ...backendInterests]) {
-    if (!interest?.key || !interest?.label || seen.has(interest.key)) {
-      continue;
-    }
-
-    merged.push(interest);
-    seen.add(interest.key);
-  }
-
-  for (const article of articles) {
-    if (!article?.category) {
-      continue;
-    }
-
-    const key = interestKeyFromValue(article.category);
-    if (!key || seen.has(key)) {
-      continue;
-    }
-
-    merged.push({
-      key,
-      label: article.category,
-    });
-    seen.add(key);
-  }
-
-  return merged;
+function contentPreview(article) {
+  const text = article.content || article.summary || "";
+  const words = text.split(/\s+/).slice(0, 28).join(" ");
+  return words ? words + "…" : "No content preview available.";
 }
 
-function syncInterestState(status, articles) {
-  availableInterests = buildAvailableInterests(status, articles);
-
-  const availableKeys = new Set(availableInterests.map((interest) => interest.key));
-  const requestedSelection = Array.isArray(status.selected_interests)
-    ? status.selected_interests
-    : [];
-  const filteredSelection = requestedSelection.filter((key) => availableKeys.has(key));
-
-  selectedInterests =
-    filteredSelection.length > 0
-      ? filteredSelection
-      : availableInterests.map((interest) => interest.key);
-
-  interestKeywords = Array.isArray(status.interest_keywords)
-    ? status.interest_keywords
-    : [];
+function articleMeta(article) {
+  const parts = [];
+  if (article.category) parts.push(article.category);
+  if (article.published) parts.push(article.published);
+  return parts.join(" • ") || "Publication date unavailable";
 }
 
-function renderInterestOptions() {
-  const allSelected =
-    availableInterests.length > 0 && selectedInterests.length === availableInterests.length;
+/* ----- Render: Status ----- */
+function renderStatus(status) {
+  metricArticles.textContent = String(status.article_count ?? 0);
+  metricIndexed.textContent = String(status.indexed_count ?? 0);
+  metricUpdated.textContent = formatDate(status.last_updated);
+}
 
-  interestOptions.innerHTML = `
-    <button
-      type="button"
-      class="interest-filter ${allSelected ? "selected" : ""}"
-      data-interest-key="all"
-    >
-      All News
-    </button>
-    ${availableInterests
+/* ----- Render: Filter bar ----- */
+function renderFilterBar() {
+  const chips = [
+    { key: "all", label: "All News", icon: "📋" },
+    ...availableInterests.map((i) => {
+      const icons = {
+        technology: "💻", science: "🔬", world: "🌍", business: "📊",
+        health: "🏥", sports: "⚽", ai_ml: "🤖", climate: "🌿",
+      };
+      return { key: i.key, label: i.label, icon: icons[i.key] || "📄" };
+    }),
+  ];
+
+  filterBar.innerHTML = chips
     .map(
-      (interest) => `
+      (chip) => `
         <button
-          type="button"
-          class="interest-filter ${selectedInterests.includes(interest.key) ? "selected" : ""}"
-          data-interest-key="${escapeAttribute(interest.key)}"
+          class="filter-chip ${chip.key === activeFilter ? "active" : ""}"
+          data-filter="${escapeAttr(chip.key)}"
         >
-          ${escapeHtml(interest.label)}
+          ${chip.icon} ${escapeHtml(chip.label)}
         </button>
       `
     )
-    .join("")}
-  `;
-}
-
-function renderActiveInterests() {
-  const selectedSet = new Set(selectedInterests);
-  const chosen = availableInterests.filter((interest) => selectedSet.has(interest.key));
-  const keywordPills = interestKeywords.map(
-    (keyword) => `<span class="interest-pill keyword-pill">${escapeHtml(keyword)}</span>`
-  );
-
-  if (!chosen.length) {
-    activeInterestsEl.innerHTML =
-      keywordPills.join("") || `<span class="interest-pill muted">None selected</span>`;
-    return;
-  }
-
-  activeInterestsEl.innerHTML = chosen
-    .map(
-      (interest) => `<span class="interest-pill">${escapeHtml(interest.label)}</span>`
-    )
-    .concat(keywordPills)
     .join("");
 }
 
-function renderArticles(articles) {
+filterBar.addEventListener("click", (event) => {
+  const chip = event.target.closest(".filter-chip");
+  if (!chip) return;
+  activeFilter = chip.dataset.filter;
+  renderFilterBar();
+  renderArticles();
+});
+
+/* ----- Render: Articles ----- */
+function getFilteredArticles() {
+  let articles = [...allArticles];
+
+  // Sort by date
+  articles.sort(
+    (a, b) =>
+      dateRank(b.published) - dateRank(a.published) ||
+      dateRank(b.fetched_at) - dateRank(a.fetched_at)
+  );
+
+  // Prioritize by user interests
+  const userInterestLabels = new Set(
+    (profile.interests || []).map((k) => k.toLowerCase())
+  );
+
+  articles = articles.map((article, idx) => {
+    const catKey = interestKeyFromValue(article.category);
+    let score = 0;
+    if (userInterestLabels.has(catKey)) score += 10;
+    return { article, score, idx };
+  });
+  articles.sort((a, b) => b.score - a.score || a.idx - b.idx);
+  articles = articles.map((item) => item.article);
+
+  // Filter by active category
+  if (activeFilter !== "all") {
+    const filterLabel = availableInterests.find((i) => i.key === activeFilter)?.label;
+    if (filterLabel) {
+      articles = articles.filter(
+        (a) => a.category && a.category.toLowerCase() === filterLabel.toLowerCase()
+      );
+    }
+  }
+
+  return articles;
+}
+
+function renderArticles() {
+  const articles = getFilteredArticles();
+
   if (!articles.length) {
-    articleList.innerHTML = `
+    articleGrid.innerHTML = `
       <div class="empty-state">
-        No articles are loaded yet. Refresh the knowledge base to pull in the
-        current RSS feed set.
+        ${activeFilter !== "all"
+          ? "No articles match this filter. Try selecting a different interest."
+          : "No articles loaded yet. Click Refresh News when you want to fetch the latest articles."
+        }
       </div>
     `;
     return;
   }
 
-  articleList.innerHTML = articles
+  articleGrid.innerHTML = articles
     .map(
       (article) => `
-        <article class="article-card">
-          ${article.category ? `<span class="category-badge">${escapeHtml(article.category)}</span>` : ""}
-          <h3>${escapeHtml(article.title || "Untitled Article")}</h3>
+        <div class="article-card" data-link="${escapeAttr(article.link || "")}">
+          ${article.category ? `<span class="card-category">${escapeHtml(article.category)}</span>` : ""}
+          <h3 class="card-title">${escapeHtml(article.title || "Untitled Article")}</h3>
           <p class="card-meta">${escapeHtml(articleMeta(article))}</p>
-          <p class="card-summary">${escapeHtml(articleSummary(article))}</p>
-          <a class="card-link" href="${escapeAttribute(article.link || "#")}" target="_blank" rel="noreferrer">
-            Open article
-          </a>
-        </article>
+          <p class="card-preview">${escapeHtml(contentPreview(article))}</p>
+          <div class="card-summary-slot" id="summary-${escapeAttr(btoa(article.link || "").replace(/[^a-zA-Z0-9]/g, ""))}"></div>
+          <div class="card-actions">
+            <a class="card-link" href="${escapeAttr(article.link || "#")}" target="_blank" rel="noreferrer">Read article ↗</a>
+            <button
+              class="btn-summarize"
+              data-article-link="${escapeAttr(article.link || "")}"
+            >
+              ✨ Summarize
+            </button>
+          </div>
+        </div>
       `
     )
     .join("");
 }
 
-function getPrioritizedArticles(articles) {
-  if (!articles.length) {
-    return [];
-  }
+/* ----- Summarize handler ----- */
+articleGrid.addEventListener("click", async (event) => {
+  const btn = event.target.closest(".btn-summarize");
+  if (!btn || btn.disabled) return;
 
-  const sortedArticles = sortArticlesByLatest(articles);
+  const link = btn.dataset.articleLink;
+  if (!link) return;
 
-  const shouldPrioritizeByInterest =
-    availableInterests.length > 0 && selectedInterests.length < availableInterests.length;
-  const normalizedKeywords = interestKeywords.map((keyword) => keyword.toLowerCase());
-  const selectedInterestTerms = availableInterests
-    .filter((interest) => selectedInterests.includes(interest.key))
-    .map((interest) => interest.label.toLowerCase());
-
-  if (!shouldPrioritizeByInterest && !normalizedKeywords.length) {
-    return sortedArticles;
-  }
-
-  const selectedSet = new Set(selectedInterests);
-
-  return sortedArticles
-    .map((article, index) => {
-      const categoryKey = interestKeyFromValue(article.category);
-      const textHaystack = `${article.title || ""} ${article.summary || ""} ${article.content || ""}`
-        .toLowerCase();
-      let score = 0;
-
-      if (
-        shouldPrioritizeByInterest &&
-        (selectedSet.has(categoryKey) ||
-          selectedInterestTerms.some((term) => textHaystack.includes(term)))
-      ) {
-        score += 100;
-      }
-
-      if (normalizedKeywords.some((keyword) => textHaystack.includes(keyword))) {
-        score += 10;
-      }
-
-      return {
-        article,
-        index,
-        score,
-        publishedRank: dateRank(article.published),
-        fetchedRank: dateRank(article.fetched_at),
-      };
-    })
-    .sort(
-      (left, right) =>
-        right.score - left.score ||
-        right.publishedRank - left.publishedRank ||
-        right.fetchedRank - left.fetchedRank ||
-        left.index - right.index
-    )
-    .map((item) => item.article);
-}
-
-function updateArticleList() {
-  renderArticles(getPrioritizedArticles(allArticles));
-}
-
-async function refreshKnowledgeBase(messagePrefix = "Refreshing feeds and rebuilding the index...") {
-  if (refreshInFlight) {
-    return;
-  }
-
-  if (!selectedInterests.length) {
-    return;
-  }
-
-  refreshInFlight = true;
+  btn.disabled = true;
+  btn.classList.add("loading");
+  btn.textContent = "⏳ Generating…";
 
   try {
-    const payload = await fetchJson("/api/refresh", {
+    const payload = await fetchJson("/api/summarize", {
       method: "POST",
-      body: JSON.stringify({
-        selected_interests: selectedInterests,
-        interest_keywords: parseInterestKeywords(interestKeywordsInput.value),
-      }),
+      body: JSON.stringify({ article_link: link }),
     });
 
-    renderStatus(payload.status);
-    allArticles = payload.articles || [];
-    syncInterestState(payload.status, allArticles);
-    renderInterestOptions();
-    interestKeywordsInput.value = interestKeywords.join(", ");
-    renderActiveInterests();
-    updateArticleList();
-  } catch (error) {
-    console.error(messagePrefix, error);
-  } finally {
-    refreshInFlight = false;
-  }
-}
+    const card = btn.closest(".article-card");
+    const slotId = "summary-" + btoa(link).replace(/[^a-zA-Z0-9]/g, "");
+    const slot = card.querySelector(`#${slotId}`) || card.querySelector(".card-summary-slot");
 
-function startAutoRefresh() {
-  if (autoRefreshTimer) {
-    clearInterval(autoRefreshTimer);
-  }
-
-  autoRefreshTimer = window.setInterval(() => {
-    refreshKnowledgeBase("Checking for latest news updates...");
-  }, AUTO_REFRESH_INTERVAL_MS);
-}
-
-function renderArticlesError(message) {
-  articleList.innerHTML = `
-    <div class="empty-state">
-      <strong>Unable to load articles.</strong>
-      <p>${escapeHtml(message)}</p>
-      <p>Start the backend with <code>uvicorn src.web_server:app --reload</code> and open <code>http://127.0.0.1:8000</code>.</p>
-    </div>
-  `;
-}
-
-function renderSources(sources) {
-  sourceList.innerHTML = sources
-    .map(
-      (article) => `
-        <article class="source-card">
-          ${article.category ? `<span class="category-badge">${escapeHtml(article.category)}</span>` : ""}
-          <h3>${escapeHtml(article.title || "Untitled Article")}</h3>
-          <p class="card-meta">${escapeHtml(articleMeta(article))}</p>
-          <p class="card-summary">${escapeHtml(articleSummary(article))}</p>
-          <a class="card-link" href="${escapeAttribute(article.link || "#")}" target="_blank" rel="noreferrer">
-            Read source
-          </a>
-        </article>
-      `
-    )
-    .join("");
-}
-
-function renderRelatedTopics(topics) {
-  if (!topics.length) {
-    relatedTopicsPanel.classList.add("hidden");
-    relatedTopics.innerHTML = "";
-    return;
-  }
-
-  relatedTopicsPanel.classList.remove("hidden");
-  relatedTopics.innerHTML = topics
-    .map(
-      (topic) => `<span class="related-topic-chip">${escapeHtml(topic)}</span>`
-    )
-    .join("");
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
-function escapeAttribute(value) {
-  return escapeHtml(value);
-}
-
-async function loadDashboard() {
-  if (window.location.protocol === "file:") {
-    throw new Error(
-      "This frontend needs the Python API server. Open it through http://127.0.0.1:8000 instead of opening index.html directly."
-    );
-  }
-
-  const [statusPayload, articlesPayload] = await Promise.all([
-    fetchJson("/api/status"),
-    fetchJson("/api/articles"),
-  ]);
-  const articles = articlesPayload.articles || [];
-  allArticles = articles;
-
-  renderStatus(statusPayload);
-  syncInterestState(statusPayload, articles);
-  renderInterestOptions();
-  interestKeywordsInput.value = interestKeywords.join(", ");
-  renderActiveInterests();
-  updateArticleList();
-
-  if (!autoRefreshStarted) {
-    autoRefreshStarted = true;
-    refreshKnowledgeBase("Loading the latest news automatically...");
-    startAutoRefresh();
-  }
-}
-
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") {
-    refreshKnowledgeBase("Updating news after returning to the page...");
-  }
-});
-
-interestOptions.addEventListener("click", (event) => {
-  const clickedElement = event.target;
-  if (!(clickedElement instanceof Element)) {
-    return;
-  }
-
-  const target = clickedElement.closest("[data-interest-key]");
-  if (!(target instanceof HTMLElement)) {
-    return;
-  }
-
-  const selectedKey = target.dataset.interestKey;
-  if (selectedKey === "all") {
-    selectedInterests = availableInterests.map((interest) => interest.key);
-  } else if (selectedInterests.includes(selectedKey)) {
-    if (selectedInterests.length === 1) {
-      selectedInterests = availableInterests.map((interest) => interest.key);
-    } else {
-      selectedInterests = selectedInterests.filter((interest) => interest !== selectedKey);
+    if (slot) {
+      slot.innerHTML = `<div class="card-summary-full">${escapeHtml(payload.summary)}</div>`;
     }
-  } else {
-    selectedInterests = [...selectedInterests, selectedKey];
+
+    btn.classList.remove("loading");
+    btn.classList.add("done");
+    btn.textContent = "✓ Summarized";
+  } catch (error) {
+    btn.classList.remove("loading");
+    btn.disabled = false;
+    btn.textContent = "✨ Summarize";
+    console.error("Summarize error:", error);
   }
-
-  renderInterestOptions();
-  renderActiveInterests();
-  updateArticleList();
 });
 
-interestKeywordsInput.addEventListener("input", () => {
-  interestKeywords = parseInterestKeywords(interestKeywordsInput.value);
-  renderActiveInterests();
-  updateArticleList();
-});
-
+/* ----- Q&A ----- */
 questionForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   const question = questionInput.value.trim();
   if (!question) {
     answerPanel.classList.remove("hidden");
-    answerText.textContent = "Please enter a question before submitting.";
-    renderRelatedTopics([]);
-    sourceList.innerHTML = "";
+    answerText.textContent = "Please enter a question first.";
+    relatedPanel.classList.add("hidden");
+    sourcePanel.classList.add("hidden");
     return;
   }
 
-  const submitButton = questionForm.querySelector("button[type='submit']");
-  submitButton.disabled = true;
+  const submitBtn = questionForm.querySelector("button[type='submit']");
+  submitBtn.disabled = true;
   answerPanel.classList.remove("hidden");
-  answerText.textContent = "Searching the indexed articles...";
-  renderRelatedTopics([]);
+  answerText.textContent = "Thinking through your question…";
+  relatedPanel.classList.add("hidden");
+  sourcePanel.classList.add("hidden");
   sourceList.innerHTML = "";
 
   try {
@@ -515,18 +321,110 @@ questionForm.addEventListener("submit", async (event) => {
     });
 
     answerText.textContent = payload.answer || "No answer returned.";
-    renderRelatedTopics(payload.related_topics || []);
-    renderSources(payload.sources || []);
+
+    // Related topics
+    const topics = payload.related_topics || [];
+    if (topics.length) {
+      relatedPanel.classList.remove("hidden");
+      relatedChips.innerHTML = topics
+        .map((t) => `<span class="related-chip">${escapeHtml(t)}</span>`)
+        .join("");
+    }
+
+    // Sources
+    const sources = payload.sources || [];
+    if (sources.length) {
+      sourcePanel.classList.remove("hidden");
+      sourceList.innerHTML = sources
+        .map(
+          (s) => `
+            <div class="source-card">
+              ${s.category ? `<span class="card-category" style="margin-bottom: 6px;">${escapeHtml(s.category)}</span>` : ""}
+              <h4>${escapeHtml(s.title || "Untitled")}</h4>
+              <p class="source-meta">${escapeHtml(articleMeta(s))}</p>
+              <p class="source-summary">${escapeHtml(contentPreview(s))}</p>
+              <a class="source-link" href="${escapeAttr(s.link || "#")}" target="_blank" rel="noreferrer">Read source ↗</a>
+            </div>
+          `
+        )
+        .join("");
+    }
   } catch (error) {
     answerText.textContent = error.message;
-    renderRelatedTopics([]);
-    sourceList.innerHTML = "";
   } finally {
-    submitButton.disabled = false;
+    submitBtn.disabled = false;
   }
 });
 
-loadDashboard().catch((error) => {
-  renderArticlesError(error.message);
-  console.error(error);
-});
+/* ----- Refresh ----- */
+async function refreshKnowledgeBase() {
+  if (refreshInFlight) return;
+  refreshInFlight = true;
+  if (btnRefreshNews) {
+    btnRefreshNews.disabled = true;
+    btnRefreshNews.textContent = "Refreshing...";
+  }
+
+  try {
+    const payload = await fetchJson("/api/refresh", {
+      method: "POST",
+      body: JSON.stringify({
+        selected_interests: profile.interests,
+      }),
+    });
+
+    renderStatus(payload.status);
+    allArticles = payload.articles || [];
+
+    if (Array.isArray(payload.status.available_interests)) {
+      availableInterests = payload.status.available_interests;
+    }
+
+    renderFilterBar();
+    renderArticles();
+  } catch (error) {
+    console.error("Refresh error:", error);
+  } finally {
+    refreshInFlight = false;
+    if (btnRefreshNews) {
+      btnRefreshNews.disabled = false;
+      btnRefreshNews.textContent = "Refresh News";
+    }
+  }
+}
+
+/* ----- Load dashboard ----- */
+async function loadDashboard() {
+  try {
+    const [statusPayload, articlesPayload] = await Promise.all([
+      fetchJson("/api/status"),
+      fetchJson("/api/articles"),
+    ]);
+
+    allArticles = articlesPayload.articles || [];
+    availableInterests = statusPayload.available_interests || [];
+
+    renderStatus(statusPayload);
+    renderFilterBar();
+    renderArticles();
+  } catch (error) {
+    articleGrid.innerHTML = `
+      <div class="empty-state">
+        <strong>Unable to connect to the backend.</strong>
+        <p style="margin: 8px 0 0; font-size: 0.9rem;">${escapeHtml(error.message)}</p>
+        <p style="margin: 8px 0 0; font-size: 0.85rem; color: var(--ink-muted);">
+          Start the server with <code>python src/web_server.py</code> and open <code>http://127.0.0.1:8000/</code>.
+        </p>
+      </div>
+    `;
+    console.error(error);
+  }
+}
+
+if (btnRefreshNews) {
+  btnRefreshNews.addEventListener("click", () => {
+    refreshKnowledgeBase();
+  });
+}
+
+loadDashboard();

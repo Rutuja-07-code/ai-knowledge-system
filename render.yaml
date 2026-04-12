@@ -1,20 +1,20 @@
-services:
-  - type: web
-    name: ai-knowledge-system
-    runtime: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn src.web_server:app --host 0.0.0.0 --port $PORT
-    healthCheckPath: /
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.10.14
-      - key: AI_KNOWLEDGE_DB_PATH
-        value: /var/data/knowledge.db
-      - key: OLLAMA_MODEL
-        value: phi:latest
-      - key: OLLAMA_TIMEOUT
-        value: "60"
-    disk:
-      name: ai-knowledge-data
-      mountPath: /var/data
-      sizeGB: 1
+# services:
+#   - type: web
+#     name: ai-knowledge-system
+#     runtime: python
+#     buildCommand: pip install -r requirements.txt
+#     startCommand: uvicorn src.web_server:app --host 0.0.0.0 --port $PORT
+#     healthCheckPath: /
+#     envVars:
+#       - key: PYTHON_VERSION
+#         value: 3.10.14
+#       - key: AI_KNOWLEDGE_DB_PATH
+#         value: /var/data/knowledge.db
+#       - key: OLLAMA_MODEL
+#         value: phi:latest
+#       - key: OLLAMA_TIMEOUT
+#         value: "60"
+#     disk:
+#       name: ai-knowledge-data
+#       mountPath: /var/data
+#       sizeGB: 1

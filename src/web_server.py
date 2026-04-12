@@ -94,6 +94,28 @@ async def api_ask(request: Request):
     return result
 
 
+@app.post("/api/summarize")
+async def api_summarize(request: Request):
+    payload = await _read_json_body(request)
+    article_link = (payload or {}).get("article_link", "").strip()
+    if not article_link:
+        return JSONResponse(
+            {"error": "Please provide an article_link to summarize."},
+            status_code=400,
+        )
+
+    with service_lock:
+        summary = service.summarize_article(article_link)
+
+    if summary is None:
+        return JSONResponse(
+            {"error": "Article not found in the knowledge base."},
+            status_code=404,
+        )
+
+    return {"summary": summary}
+
+
 async def _read_json_body(request: Request):
     try:
         return await request.json()

@@ -28,19 +28,28 @@ def build_store(items):
 
 
 def search(query_embedding, k=3):
+    return [item["document"] for item in search_with_scores(query_embedding, k=k)]
+
+
+def search_with_scores(query_embedding, k=3):
     if not documents or index.ntotal == 0:
         return []
 
     result_count = min(k, len(documents))
     query_vector = np.asarray([query_embedding], dtype="float32")
-    _, indices = index.search(query_vector, result_count)
+    distances, indices = index.search(query_vector, result_count)
 
     results = []
-    for idx in indices[0]:
+    for rank, idx in enumerate(indices[0]):
         if idx == -1:
             continue
         if idx < len(documents):
-            results.append(documents[idx])
+            results.append(
+                {
+                    "document": documents[idx],
+                    "distance": float(distances[0][rank]),
+                }
+            )
 
     return results
 

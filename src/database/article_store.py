@@ -54,8 +54,8 @@ class ArticleStore:
         if not self.legacy_json_path or not self.legacy_json_path.exists():
             return
 
-        # if self.count_articles() > 0:
-        #     return
+        if self.count_articles() > 0:
+            return
 
         with self.legacy_json_path.open("r", encoding="utf-8") as file:
             articles = json.load(file)
@@ -68,6 +68,7 @@ class ArticleStore:
             tz=timezone.utc,
         ).isoformat()
         self.replace_articles(articles, fetched_at=fetched_at)
+        self.set_metadata("data_source", "legacy_json")
 
     def count_articles(self):
         with self._connect() as connection:
@@ -185,6 +186,37 @@ class ArticleStore:
                 ON CONFLICT(key) DO UPDATE SET value = excluded.value
                 """,
                 (key, value),
+            )
+
+    def get_article_by_link(self, link):
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT
+                    title,
+                    link,
+                    category,
+                    published,
+                    content,
+                    content_source,
+                    summary,
+                    fetched_at
+                FROM articles
+                WHERE link = ?
+                """,
+                (link,),
+            ).fetchone()
+
+        if not row:
+            return None
+
+        return dict(row)
+
+    def update_article_summary(self, link, summary):
+        with self._connect() as connection:
+            connection.execute(
+                "UPDATE articles SET summary = ? WHERE link = ?",
+                (summary, link),
             )
 
     def _article_sort_key(self, article):

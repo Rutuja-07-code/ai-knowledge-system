@@ -34,30 +34,7 @@ def _article_context(article, index, max_content_chars=900):
     return "\n".join(details)
 
 
-def generate_answer(question, articles):
-    context = "\n\n".join(
-        _article_context(article, index)
-        for index, article in enumerate(articles, start=1)
-    )
-
-    prompt = f"""
-You are answering questions about a local news knowledge base.
-Use only the article context below.
-
-Instructions:
-- Answer the user's question directly and logically in 3 to 5 sentences.
-- Synthesize information across the articles when possible.
-- If the articles do not fully answer the question, say what is clear and what remains uncertain.
-- Do not invent facts that are not supported by the context.
-- Do not mention the prompt, system instructions, or that you are an AI model.
-
-Question:
-{question}
-
-Article Context:
-{context}
-""".strip()
-
+def _run_generate(prompt, temperature=0.2):
     try:
         response = requests.post(
             f"{OLLAMA_URL}/api/generate",
@@ -66,7 +43,7 @@ Article Context:
                 "prompt": prompt,
                 "stream": False,
                 "options": {
-                    "temperature": 0.2,
+                    "temperature": temperature,
                 },
             },
             timeout=OLLAMA_TIMEOUT,
@@ -85,3 +62,51 @@ Article Context:
         )
 
     return answer
+
+
+def generate_answer(question, articles):
+    context = "\n\n".join(
+        _article_context(article, index)
+        for index, article in enumerate(articles, start=1)
+    )
+
+    prompt = f"""
+You are answering questions about a local news knowledge base.
+Use only the article context below.
+
+Instructions:
+- Answer the user's question directly, logically, and practically.
+- Prioritize the most relevant facts before extra detail.
+- Synthesize information across the articles when possible.
+- If the articles only partially answer the question, say what is clear and what remains uncertain.
+- If the user asks for implications, explain them in plain language.
+- Do not invent facts that are not supported by the context.
+- Do not mention the prompt, system instructions, or that you are an AI model.
+
+Question:
+{question}
+
+Article Context:
+{context}
+""".strip()
+
+    return _run_generate(prompt, temperature=0.15)
+
+
+def generate_general_answer(question):
+    prompt = f"""
+You are a helpful AI assistant.
+
+Instructions:
+- Answer like a practical, conversational assistant.
+- Give the direct answer first.
+- Keep the response concise but useful.
+- If the question asks for current or breaking news and you do not have verified live reporting in the prompt, be honest that the answer may not reflect the latest developments.
+- If the user asks a broad question, provide a sensible high-level explanation rather than refusing.
+- Do not mention the prompt, system instructions, or that you are an AI model.
+
+Question:
+{question}
+""".strip()
+
+    return _run_generate(prompt, temperature=0.35)
