@@ -43,6 +43,18 @@ class ArticleStore:
                 )
                 """
             )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS user_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_type TEXT NOT NULL,
+                    article_link TEXT,
+                    query TEXT,
+                    category TEXT,
+                    timestamp TEXT NOT NULL
+                )
+                """
+            )
             columns = {
                 row["name"]
                 for row in connection.execute("PRAGMA table_info(articles)").fetchall()
@@ -218,6 +230,111 @@ class ArticleStore:
                 "UPDATE articles SET summary = ? WHERE link = ?",
                 (summary, link),
             )
+
+    # ---- User Event Tracking ----
+
+    def add_event(self, event_type, article_link=None, query=None, category=None):
+        """Record a user click or search event."""
+        timestamp = datetime.now(timezone.utc).isoformat()
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO user_events (event_type, article_link, query, category, timestamp)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (event_type, article_link, query, category, timestamp),
+            )
+
+    def get_recent_events(self, event_type=None, limit=50):
+        """Fetch recent user events, optionally filtered by type."""
+        with self._connect() as connection:
+            if event_type:
+                rows = connection.execute(
+                    """
+                    SELECT event_type, article_link, query, category, timestamp
+                    FROM user_events
+                    WHERE event_type = ?
+                    ORDER BY id DESC
+                    LIMIT ?
+                    """,
+                    (event_type, limit),
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    """
+                    SELECT event_type, article_link, query, category, timestamp
+                    FROM user_events
+                    ORDER BY id DESC
+                    LIMIT ?
+                    """,
+                    (limit,),
+                ).fetchall()
+        return [dict(row) for row in rows]
+
+    def get_click_history(self, limit=20):
+        """Return recently clicked article links."""
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT DISTINCT article_link
+                FROM user_events
+                WHERE event_type = 'click' AND article_link IS NOT NULL
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [row["article_link"] for row in rows]
+
+    def get_search_history(self, limit=10):
+        """Return recent search queries."""
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT DISTINCT query
+                FROM user_events
+                WHERE event_type = 'search' AND query IS NOT NULL AND query != ''
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [row["query"] for row in rows]
+
+    def get_category_counts(self):
+        """Aggregate click counts by category."""
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT LOWER(category) AS cat, COUNT(*) AS cnt
+                FROM user_events
+                WHERE event_type = 'click'
+                  AND category IS NOT NULL
+                  AND category != ''
+                GROUP BY LOWER(category)
+                ORDER BY cnt DESC
+                """
+            ).fetchall()
+        return {row["cat"]: row["cnt"] for row in rows}
+
+    def get_clicked_articles(self, limit=20):
+        """Return full article dicts for recently clicked articles."""
+        clicked_links = self.get_click_history(limit=limit)
+        if not clicked_links:
+            return []
+
+        placeholders = ", ".join("?" for _ in clicked_links)
+        with self._connect() as connection:
+            rows = connection.execute(
+                f"""
+                SELECT title, link, category, published, content,
+                       content_source, summary, fetched_at
+                FROM articles
+                WHERE link IN ({placeholders})
+                """,
+                clicked_links,
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def _article_sort_key(self, article):
         return (

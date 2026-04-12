@@ -116,6 +116,82 @@ async def api_summarize(request: Request):
     return {"summary": summary}
 
 
+@app.post("/api/search")
+async def api_search(request: Request):
+    payload = await _read_json_body(request)
+    query = (payload or {}).get("query", "").strip()
+    limit = int((payload or {}).get("limit", 10))
+    if not query:
+        return JSONResponse(
+            {"error": "Please provide a search query."},
+            status_code=400,
+        )
+
+    # Track the search event
+    service.track_event(event_type="search", query=query)
+
+    with service_lock:
+        results = service.search_articles(query, limit=limit)
+
+    search_history = service.get_search_history(limit=8)
+    return {"results": results, "search_history": search_history}
+
+
+@app.get("/api/recommendations")
+async def api_recommendations():
+    with service_lock:
+        recommendations = service.get_recommendations(limit=8)
+    return {"recommendations": recommendations}
+
+
+@app.get("/api/trending")
+async def api_trending():
+    with service_lock:
+        trending = service.get_trending_topics(limit=12)
+    return {"trending": trending}
+
+
+@app.post("/api/track")
+async def api_track(request: Request):
+    payload = await _read_json_body(request)
+    event_type = (payload or {}).get("event_type", "").strip()
+    if event_type not in ("click", "search"):
+        return JSONResponse(
+            {"error": "event_type must be 'click' or 'search'."},
+            status_code=400,
+        )
+
+    service.track_event(
+        event_type=event_type,
+        article_link=(payload or {}).get("article_link"),
+        query=(payload or {}).get("query"),
+        category=(payload or {}).get("category"),
+    )
+    return {"status": "tracked"}
+
+
+@app.post("/api/credibility")
+async def api_credibility(request: Request):
+    payload = await _read_json_body(request)
+    article_link = (payload or {}).get("article_link", "").strip()
+    if not article_link:
+        return JSONResponse(
+            {"error": "Please provide an article_link to check."},
+            status_code=400,
+        )
+
+    with service_lock:
+        result = service.detect_credibility(article_link)
+
+    if result is None:
+        return JSONResponse(
+            {"error": "Article not found in the knowledge base."},
+            status_code=404,
+        )
+
+    return result
+
+
 async def _read_json_body(request: Request):
     try:
         return await request.json()

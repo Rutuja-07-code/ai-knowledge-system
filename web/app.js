@@ -1,6 +1,7 @@
 /* ============================================================
    Dashboard — app.js
    Handles auth guard, news feed, Q&A, interest filtering,
+   search, trending topics, recommendations, credibility,
    and on-demand transformer summarization.
    ============================================================ */
 
@@ -42,12 +43,19 @@ const relatedChips = document.getElementById("relatedChips");
 const sourcePanel = document.getElementById("sourcePanel");
 const sourceList = document.getElementById("sourceList");
 const articleGrid = document.getElementById("articleGrid");
+const searchInput = document.getElementById("searchInput");
+const btnSearch = document.getElementById("btnSearch");
+const searchHistory = document.getElementById("searchHistory");
+const searchResults = document.getElementById("searchResults");
+const trendingList = document.getElementById("trendingList");
+const recoList = document.getElementById("recoList");
 
 /* ----- State ----- */
 let allArticles = [];
 let availableInterests = [];
 let activeFilter = "all";
 let refreshInFlight = false;
+let searchDebounce = null;
 
 /* ----- Init ----- */
 function initProfile() {
@@ -236,7 +244,10 @@ function renderArticles() {
     .map(
       (article) => `
         <div class="article-card" data-link="${escapeAttr(article.link || "")}">
-          ${article.category ? `<span class="card-category">${escapeHtml(article.category)}</span>` : ""}
+          <div class="card-top-row">
+            ${article.category ? `<span class="card-category">${escapeHtml(article.category)}</span>` : ""}
+            <span class="cred-slot" id="cred-${escapeAttr(btoa(article.link || "").replace(/[^a-zA-Z0-9]/g, ""))}"></span>
+          </div>
           <h3 class="card-title">${escapeHtml(article.title || "Untitled Article")}</h3>
           <p class="card-meta">${escapeHtml(articleMeta(article))}</p>
           <p class="card-preview">${escapeHtml(contentPreview(article))}</p>
@@ -249,12 +260,100 @@ function renderArticles() {
             >
               ✨ Summarize
             </button>
+            <button
+              class="btn-credibility"
+              data-article-link="${escapeAttr(article.link || "")}"
+            >
+              🛡️ Check Credibility
+            </button>
           </div>
         </div>
       `
     )
     .join("");
 }
+
+/* ----- Tracking: clicks ----- */
+articleGrid.addEventListener("click", (event) => {
+  const card = event.target.closest(".article-card");
+  const link = event.target.closest("a.card-link");
+
+  // Track clicks on "Read article" links
+  if (link && card) {
+    const articleLink = card.dataset.link;
+    const category = card.querySelector(".card-category")?.textContent?.trim() || "";
+    trackEvent("click", articleLink, null, category);
+  }
+});
+
+async function trackEvent(eventType, articleLink, query, category) {
+  try {
+    await fetchJson("/api/track", {
+      method: "POST",
+      body: JSON.stringify({
+        event_type: eventType,
+        article_link: articleLink || null,
+        query: query || null,
+        category: category || null,
+      }),
+    });
+    // Refresh recommendations after a click
+    if (eventType === "click") {
+      setTimeout(loadRecommendations, 500);
+    }
+  } catch (_) {
+    // Tracking is fire-and-forget
+  }
+}
+
+/* ----- Credibility checker ----- */
+articleGrid.addEventListener("click", async (event) => {
+  const btn = event.target.closest(".btn-credibility");
+  if (!btn || btn.disabled) return;
+
+  const link = btn.dataset.articleLink;
+  if (!link) return;
+
+  btn.disabled = true;
+  btn.textContent = "🛡️ Checking…";
+
+  try {
+    const result = await fetchJson("/api/credibility", {
+      method: "POST",
+      body: JSON.stringify({ article_link: link }),
+    });
+
+    const card = btn.closest(".article-card");
+    const slotId = "cred-" + btoa(link).replace(/[^a-zA-Z0-9]/g, "");
+    const slot = card.querySelector(`#${slotId}`) || card.querySelector(".cred-slot");
+
+    if (slot) {
+      const label = result.label || "UNKNOWN";
+      const confidence = Math.round((result.confidence || 0) * 100);
+      let badgeClass = "cred-unknown";
+      let emoji = "🟡";
+      let text = "Unverified";
+
+      if (label === "REAL") {
+        badgeClass = "cred-real";
+        emoji = "🟢";
+        text = "Verified";
+      } else if (label === "FAKE") {
+        badgeClass = "cred-fake";
+        emoji = "🔴";
+        text = "Suspicious";
+      }
+
+      slot.innerHTML = `<span class="cred-badge ${badgeClass}">${emoji} ${text} (${confidence}%)</span>`;
+    }
+
+    btn.style.display = "none";
+  } catch (error) {
+    btn.disabled = false;
+    btn.textContent = "🛡️ Check Credibility";
+    console.error("Credibility error:", error);
+  }
+});
 
 /* ----- Summarize handler ----- */
 articleGrid.addEventListener("click", async (event) => {
@@ -356,6 +455,180 @@ questionForm.addEventListener("submit", async (event) => {
   }
 });
 
+/* ============================================================
+   SEARCH SYSTEM
+   ============================================================ */
+
+function performSearch() {
+  const query = searchInput.value.trim();
+  if (!query) {
+    searchResults.classList.add("hidden");
+    return;
+  }
+
+  fetchJson("/api/search", {
+    method: "POST",
+    body: JSON.stringify({ query, limit: 8 }),
+  })
+    .then((payload) => {
+      const results = payload.results || [];
+      const history = payload.search_history || [];
+
+      if (!results.length) {
+        searchResults.innerHTML = `<div class="search-result-item"><div class="search-result-title">No results found for "${escapeHtml(query)}"</div></div>`;
+        searchResults.classList.remove("hidden");
+        return;
+      }
+
+      searchResults.innerHTML = results
+        .map(
+          (item) => `
+          <a class="search-result-item" href="${escapeAttr(item.article?.link || "#")}" target="_blank" rel="noreferrer">
+            <span class="search-result-score">${Math.round(item.score * 100)}%</span>
+            <div class="search-result-title">${escapeHtml(item.article?.title || "Untitled")}</div>
+            <div class="search-result-meta">${escapeHtml(item.article?.category || "")} ${item.article?.published ? "• " + escapeHtml(item.article.published) : ""}</div>
+          </a>
+        `
+        )
+        .join("");
+      searchResults.classList.remove("hidden");
+
+      // Update search history chips
+      renderSearchHistory(history);
+    })
+    .catch((error) => {
+      console.error("Search error:", error);
+      searchResults.classList.add("hidden");
+    });
+}
+
+searchInput.addEventListener("input", () => {
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(performSearch, 400);
+});
+
+searchInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    clearTimeout(searchDebounce);
+    performSearch();
+  }
+});
+
+btnSearch.addEventListener("click", () => {
+  clearTimeout(searchDebounce);
+  performSearch();
+});
+
+// Close search results when clicking outside
+document.addEventListener("click", (event) => {
+  if (!event.target.closest(".search-hero")) {
+    searchResults.classList.add("hidden");
+  }
+});
+
+function renderSearchHistory(history) {
+  if (!history || !history.length) {
+    searchHistory.innerHTML = "";
+    return;
+  }
+
+  searchHistory.innerHTML = `<span style="font-size: 0.75rem; color: var(--ink-muted); margin-right: 4px;">Recent:</span>` +
+    history
+      .map(
+        (q) =>
+          `<span class="search-history-chip" data-query="${escapeAttr(q)}">${escapeHtml(q)}</span>`
+      )
+      .join("");
+}
+
+searchHistory.addEventListener("click", (event) => {
+  const chip = event.target.closest(".search-history-chip");
+  if (!chip) return;
+  searchInput.value = chip.dataset.query;
+  performSearch();
+});
+
+/* ============================================================
+   TRENDING TOPICS
+   ============================================================ */
+
+async function loadTrending() {
+  try {
+    const payload = await fetchJson("/api/trending");
+    const trending = payload.trending || [];
+
+    if (!trending.length) {
+      trendingList.innerHTML = `<div class="empty-state-sm">No trending topics yet. Refresh news to populate.</div>`;
+      return;
+    }
+
+    trendingList.innerHTML = trending
+      .map(
+        (item, index) => `
+        <div class="trending-item" data-topic="${escapeAttr(item.topic)}" style="animation-delay: ${index * 60}ms">
+          <div class="trending-rank ${index < 3 ? "top-3" : "normal"}">${index + 1}</div>
+          <div class="trending-info">
+            <div class="trending-topic">${escapeHtml(item.topic)}</div>
+            <div class="trending-count">${item.count} mentions</div>
+          </div>
+          ${index < 3 ? '<span class="trending-fire">🔥</span>' : ""}
+        </div>
+      `
+      )
+      .join("");
+  } catch (error) {
+    trendingList.innerHTML = `<div class="empty-state-sm">Unable to load trends.</div>`;
+    console.error("Trending error:", error);
+  }
+}
+
+// Click on trending topic → search for it
+trendingList.addEventListener("click", (event) => {
+  const item = event.target.closest(".trending-item");
+  if (!item) return;
+  const topic = item.dataset.topic;
+  if (topic) {
+    searchInput.value = topic;
+    performSearch();
+    searchInput.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+});
+
+/* ============================================================
+   RECOMMENDATIONS
+   ============================================================ */
+
+async function loadRecommendations() {
+  try {
+    const payload = await fetchJson("/api/recommendations");
+    const recommendations = payload.recommendations || [];
+
+    if (!recommendations.length) {
+      recoList.innerHTML = `<div class="empty-state-sm">Click and read articles to get personalized recommendations.</div>`;
+      return;
+    }
+
+    recoList.innerHTML = recommendations
+      .map(
+        (item, index) => `
+        <a class="reco-card" href="${escapeAttr(item.article?.link || "#")}" target="_blank" rel="noreferrer" style="animation-delay: ${index * 60}ms">
+          <div class="reco-match">
+            <span class="reco-match-ring"></span>
+            ${item.match_pct || 0}% match
+          </div>
+          <div class="reco-title">${escapeHtml(item.article?.title || "Untitled")}</div>
+          <div class="reco-category">${escapeHtml(item.article?.category || "")}</div>
+        </a>
+      `
+      )
+      .join("");
+  } catch (error) {
+    recoList.innerHTML = `<div class="empty-state-sm">Unable to load recommendations.</div>`;
+    console.error("Recommendations error:", error);
+  }
+}
+
 /* ----- Refresh ----- */
 async function refreshKnowledgeBase() {
   if (refreshInFlight) return;
@@ -382,6 +655,10 @@ async function refreshKnowledgeBase() {
 
     renderFilterBar();
     renderArticles();
+
+    // Reload sidebar data after refresh
+    loadTrending();
+    loadRecommendations();
   } catch (error) {
     console.error("Refresh error:", error);
   } finally {
@@ -407,6 +684,10 @@ async function loadDashboard() {
     renderStatus(statusPayload);
     renderFilterBar();
     renderArticles();
+
+    // Load sidebar panels
+    loadTrending();
+    loadRecommendations();
   } catch (error) {
     articleGrid.innerHTML = `
       <div class="empty-state">

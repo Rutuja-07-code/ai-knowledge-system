@@ -9,11 +9,13 @@ from collector.rss_collector import (
     normalize_interest_keys,
 )
 from database.article_store import ArticleStore
+from detector.fake_news_detector import detect_fake_news
 from embeddings.embedding_generator import generate_embedding
 from processing.text_cleaner import clean_text
 from rag.rag_pipeline import answer_question
+from recommender.recommender import get_recommendations as _get_recs
 from summarizer.summarizer import summarize, summarize_article as _summarize_text
-from vector_db.vector_store import add_embedding, document_count, reset_store
+from vector_db.vector_store import add_embedding, document_count, reset_store, search_with_scores
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 ARTICLES_PATH = Path(
@@ -201,6 +203,148 @@ class KnowledgeService:
             "selected_interests": self.selected_interests,
             "interest_keywords": self.interest_keywords,
         }
+
+    # ---- Search ----
+
+    def search_articles(self, query, limit=10):
+        """Hybrid semantic + keyword search across articles."""
+        if not query or not query.strip():
+            return []
+
+        query_clean = clean_text(query)
+        query_embedding = generate_embedding(query)
+
+        # Semantic search via FAISS
+        semantic_results = search_with_scores(query_embedding, k=limit + 5)
+        semantic_map = {}
+        for item in semantic_results:
+            link = item["document"].get("link", "")
+            if link:
+                semantic_score = 1.0 / (1.0 + max(item["distance"], 0.0))
+                semantic_map[link] = {
+                    "article": item["document"],
+                    "semantic_score": semantic_score,
+                }
+
+        # Keyword search — boost articles with query terms in title/content
+        keyword_map = {}
+        for article in self.articles:
+            haystack = clean_text(
+                " ".join(
+                    [
+                        article.get("title", ""),
+                        article.get("content", ""),
+                    ]
+                )
+            )
+            score = 0
+            for token in query_clean.split():
+                if len(token) > 2 and token in haystack:
+                    score += 1
+            if score > 0:
+                link = article.get("link", "")
+                keyword_map[link] = {
+                    "article": article,
+                    "keyword_score": score,
+                }
+
+        # Merge results
+        all_links = set(semantic_map.keys()) | set(keyword_map.keys())
+        merged = []
+        for link in all_links:
+            sem = semantic_map.get(link, {})
+            kw = keyword_map.get(link, {})
+            article = sem.get("article") or kw.get("article")
+            sem_score = sem.get("semantic_score", 0.0)
+            kw_score = kw.get("keyword_score", 0) * 0.1  # normalize
+            combined = sem_score + kw_score
+            merged.append({"article": article, "score": round(combined, 4)})
+
+        merged.sort(key=lambda x: -x["score"])
+        return merged[:limit]
+
+    # ---- Recommendations ----
+
+    def get_recommendations(self, limit=8):
+        """Get personalized article recommendations based on click history."""
+        clicked_articles = self.store.get_clicked_articles(limit=20)
+        clicked_links = set(self.store.get_click_history(limit=50))
+        category_counts = self.store.get_category_counts()
+        return _get_recs(
+            clicked_articles=clicked_articles,
+            clicked_links=clicked_links,
+            category_counts=category_counts,
+            limit=limit,
+        )
+
+    # ---- Trending Topics ----
+
+    def get_trending_topics(self, limit=10):
+        """Compute globally trending topics from article corpus."""
+        from collections import Counter
+
+        topic_counter = Counter()
+        topic_labels = {}  # normalized_key → display label
+
+        for article in self.articles:
+            # Count categories
+            category = (article.get("category") or "").strip()
+            if category:
+                key = clean_text(category).strip().lower()
+                topic_counter[key] += 3  # categories get boosted weight
+                topic_labels[key] = category
+
+            # Count significant title words
+            title_words = clean_text(article.get("title") or "").split()
+            for word in title_words:
+                if len(word) > 3:
+                    topic_counter[word] += 1
+                    topic_labels.setdefault(word, word.title())
+
+        # Build results
+        trending = []
+        for key, count in topic_counter.most_common(limit):
+            label = topic_labels.get(key, key.title())
+            trending.append({
+                "topic": label,
+                "count": count,
+                "key": key,
+            })
+
+        return trending
+
+    # ---- Fake News Detection ----
+
+    def detect_credibility(self, article_link):
+        """Run fake news detection on a single article."""
+        article = self.store.get_article_by_link(article_link)
+        if not article:
+            return None
+
+        text = clean_text(
+            " ".join(
+                [
+                    article.get("title", ""),
+                    article.get("content", ""),
+                ]
+            )
+        )
+        return detect_fake_news(text)
+
+    # ---- Event Tracking ----
+
+    def track_event(self, event_type, article_link=None, query=None, category=None):
+        """Record a user behaviour event (click or search)."""
+        self.store.add_event(
+            event_type=event_type,
+            article_link=article_link,
+            query=query,
+            category=category,
+        )
+
+    def get_search_history(self, limit=10):
+        """Return recent search queries for suggestion chips."""
+        return self.store.get_search_history(limit=limit)
 
     def _bootstrap_live_articles(self):
         if not self._should_refresh_on_startup():

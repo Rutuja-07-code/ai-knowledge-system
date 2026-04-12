@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Dashboard — AI Knowledge System</title>
-    <meta name="description" content="Your personalized AI-powered news dashboard with smart Q&A, article summaries, and interest-based filtering." />
+    <meta name="description" content="Your personalized AI-powered news dashboard with smart recommendations, trending topics, fake news detection, and intelligent search." />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
@@ -52,61 +52,103 @@
           </div>
         </div>
 
+        <!-- Search Bar -->
+        <div class="search-hero reveal delay-1">
+          <div class="search-hero-box">
+            <span class="search-hero-icon">🔍</span>
+            <input
+              id="searchInput"
+              class="search-hero-input"
+              type="text"
+              placeholder="Search for news, topics, or anything..."
+              autocomplete="off"
+            />
+            <button id="btnSearch" class="btn-search-go">Search</button>
+          </div>
+          <div id="searchHistory" class="search-history-chips"></div>
+          <div id="searchResults" class="search-results-dropdown hidden"></div>
+        </div>
+
         <!-- Interest filter bar -->
-        <div id="filterBar" class="filter-bar reveal delay-1">
+        <div id="filterBar" class="filter-bar reveal delay-2">
           <!-- filled by JS -->
         </div>
 
-        <!-- Main grid -->
-        <div class="dash-grid">
-          <!-- Q&A Panel -->
-          <section class="qa-panel glass reveal delay-2">
+        <!-- Main 3-Column Grid -->
+        <div class="dash-grid-3col">
+          <!-- LEFT: Trending Topics Panel -->
+          <aside class="trending-panel glass reveal delay-2">
             <div class="panel-header">
-              <p class="panel-kicker">🔍 Question the Index</p>
-              <h2 class="panel-title">Ask about today's news</h2>
+              <p class="panel-kicker">🔥 Trending Now</p>
+              <h2 class="panel-title">Hot Topics</h2>
             </div>
-
-            <form id="questionForm">
-              <div class="search-box">
-                <span class="search-icon">🔎</span>
-                <textarea
-                  id="questionInput"
-                  class="search-input"
-                  rows="3"
-                  placeholder="What recent stories mention AI regulation or Nvidia?"
-                ></textarea>
-              </div>
-              <button type="submit" class="btn btn-primary" style="width: 100%;">Ask Question</button>
-            </form>
-
-            <div id="answerPanel" class="hidden">
-              <div class="answer-box">
-                <p class="answer-label">Answer</p>
-                <p id="answerText" class="answer-text"></p>
-              </div>
-
-              <div id="relatedPanel" class="related-panel hidden">
-                <p class="answer-label" style="margin-top: 16px;">Related Topics</p>
-                <div id="relatedChips" class="related-chips"></div>
-              </div>
-
-              <div id="sourcePanel" class="hidden">
-                <p class="answer-label" style="margin-top: 16px;">Related Coverage</p>
-                <div id="sourceList" class="source-list"></div>
-              </div>
+            <div id="trendingList" class="trending-list">
+              <div class="empty-state-sm">Loading trends...</div>
             </div>
-          </section>
+          </aside>
 
-          <!-- News Feed Panel -->
-          <section class="news-panel glass reveal delay-3">
+          <!-- CENTER: Q&A + News Feed -->
+          <main class="main-column">
+            <!-- Q&A Panel -->
+            <section class="qa-panel glass reveal delay-2">
+              <div class="panel-header">
+                <p class="panel-kicker">🔍 Question the Index</p>
+                <h2 class="panel-title">Ask about today's news</h2>
+              </div>
+
+              <form id="questionForm">
+                <div class="search-box">
+                  <span class="search-icon">🔎</span>
+                  <textarea
+                    id="questionInput"
+                    class="search-input"
+                    rows="3"
+                    placeholder="What recent stories mention AI regulation or Nvidia?"
+                  ></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Ask Question</button>
+              </form>
+
+              <div id="answerPanel" class="hidden">
+                <div class="answer-box">
+                  <p class="answer-label">Answer</p>
+                  <p id="answerText" class="answer-text"></p>
+                </div>
+
+                <div id="relatedPanel" class="related-panel hidden">
+                  <p class="answer-label" style="margin-top: 16px;">Related Topics</p>
+                  <div id="relatedChips" class="related-chips"></div>
+                </div>
+
+                <div id="sourcePanel" class="hidden">
+                  <p class="answer-label" style="margin-top: 16px;">Related Coverage</p>
+                  <div id="sourceList" class="source-list"></div>
+                </div>
+              </div>
+            </section>
+
+            <!-- News Feed Panel -->
+            <section class="news-panel glass reveal delay-3">
+              <div class="panel-header">
+                <p class="panel-kicker">📰 Article Library</p>
+                <h2 class="panel-title">Latest in your interests</h2>
+              </div>
+              <div id="articleGrid" class="article-grid">
+                <div class="empty-state">Loading articles...</div>
+              </div>
+            </section>
+          </main>
+
+          <!-- RIGHT: Recommendations Panel -->
+          <aside class="reco-panel glass reveal delay-3">
             <div class="panel-header">
-              <p class="panel-kicker">📰 Article Library</p>
-              <h2 class="panel-title">Latest in your interests</h2>
+              <p class="panel-kicker">✨ For You</p>
+              <h2 class="panel-title">Recommended</h2>
             </div>
-            <div id="articleGrid" class="article-grid">
-              <div class="empty-state">Loading articles...</div>
+            <div id="recoList" class="reco-list">
+              <div class="empty-state-sm">Click articles to get personalized recommendations.</div>
             </div>
-          </section>
+          </aside>
         </div>
       </div>
     </div>
